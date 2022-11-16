@@ -85,52 +85,12 @@
   #:use-module (gnu packages xdisorg)
   #:use-module (gnu packages xorg))
 
-;; Copied from guix/gnu/packages/rust.scm
-(define* (rust-uri version #:key (dist "static"))
-  (string-append "https://" dist ".rust-lang.org/dist/"
-                 "rustc-" version "-src.tar.gz"))
-
-(define* (rust-bootstrapped-package base-rust version checksum)
-  "Bootstrap rust VERSION with source checksum CHECKSUM using BASE-RUST."
-  (package
-    (inherit base-rust)
-    (version version)
-    (source
-     (origin
-       (inherit (package-source base-rust))
-       (uri (rust-uri version))
-       (sha256 (base32 checksum))))
-    (native-inputs
-     (alist-replace "cargo-bootstrap" (list base-rust "cargo")
-                    (alist-replace "rustc-bootstrap" (list base-rust)
-                                   (package-native-inputs base-rust))))))
-
-(define rust-firefox-1.61
-  (let ((base-rust (rust-bootstrapped-package
-                    rust "1.61.0"
-                    "1vfs05hkf9ilk19b2vahqn8l6k17pl9nc1ky9kgspaascx8l62xd")))
-    (package
-      (inherit base-rust)
-      (arguments
-       (substitute-keyword-arguments (package-arguments base-rust)
-         ((#:phases phases)
-          `(modify-phases ,phases
-             (add-after 'unpack 'disable-tests-with-sigint
-               ;; These tests rely on killing a process with SIGINT which
-               ;; fails in the build container.
-               (lambda _
-                 (substitute* "library/std/src/sys/unix/process/process_common/tests.rs"
-                   (("fn test_process_group_posix_spawn")
-                    "#[ignore]\nfn test_process_group_posix_spawn")
-                   (("fn test_process_group_no_posix_spawn")
-                    "#[ignore]\nfn test_process_group_no_posix_spawn")))))))))))
-
 ;; Define the versions of rust needed to build firefox, trying to match
 ;; upstream.  See the file taskcluster/ci/toolchain/rust.yml at
 ;; https://searchfox.org under the particular firefox release, like
 ;; mozilla-esr102.
 (define-public rust-firefox-esr rust) ; 1.60 is the default in Guix
-(define-public rust-firefox rust-firefox-1.61) ; 1.63 is also listed, but 1.61 is the minimum needed
+(define-public rust-firefox (@@ (gnu packages rust) rust-1.61)) ; 1.63 is also listed, but 1.61 is the minimum needed
 
 ;; rust-cbindgen-0.23/0.24 dependencies
 (define-public rust-unicode-ident-1
@@ -288,19 +248,19 @@ according to Unicode Standard Annex #31")
 
 ;; Update this id with every firefox update to it's release date.
 ;; It's used for cache validation and therefor can lead to strange bugs.
-(define %firefox-esr-build-id "20221018000000")
+(define %firefox-esr-build-id "20221115000000")
 
 (define-public firefox-esr
   (package
     (name "firefox-esr")
-    (version "102.4.0esr")
+    (version "102.5.0esr")
     (source
      (origin
        (method url-fetch)
        (uri (string-append "https://archive.mozilla.org/pub/firefox/releases/"
                            version "/source/firefox-" version ".source.tar.xz"))
        (sha256
-        (base32 "0klh3lbm0zdmv90kmmpkzgn15pfjibr7zsjy3kvbzpql97fhv7z7"))))
+        (base32 "1n2pq165fxmvgcr5mv3hhaid2vn7lh3jg03lf13kz4c5295x8z81"))))
     (build-system gnu-build-system)
     (arguments
      (list
@@ -705,20 +665,20 @@ MOZ_ENABLE_WAYLAND=1 exec ~a $@\n"
 
 ;; Update this id with every firefox update to it's release date.
 ;; It's used for cache validation and therefor can lead to strange bugs.
-(define %firefox-build-id "20221103000000")
+(define %firefox-build-id "20221115000000")
 
 (define-public firefox
   (package
     (inherit firefox-esr)
     (name "firefox")
-    (version "106.0.4")
+    (version "107.0")
     (source
      (origin
        (method url-fetch)
        (uri (string-append "https://archive.mozilla.org/pub/firefox/releases/"
                            version "/source/firefox-" version ".source.tar.xz"))
        (sha256
-        (base32 "1dwykdd3nyvkv34nq2zwfa6kkzw4w8pw5300y25gfny94ksx06g6"))))
+        (base32 "0jjqarvs5ppyb3395rs4i39cb55li8q8ha9w72zyjmvv75d2wmla"))))
     (arguments
      (substitute-keyword-arguments (package-arguments firefox-esr)
        ((#:phases phases)

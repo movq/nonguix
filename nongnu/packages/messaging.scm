@@ -50,7 +50,7 @@
 (define-public element-desktop
   (package
     (name "element-desktop")
-    (version "1.11.13")
+    (version "1.11.14")
     (source
      (origin
        (method url-fetch)
@@ -59,7 +59,7 @@
          "https://packages.riot.im/debian/pool/main/e/" name "/" name "_" version
          "_amd64.deb"))
        (sha256
-        (base32 "04q2jwjykkch5giva1c6z6lljxqdw1i4xyh1bifmb4kybqmbrcnp"))))
+        (base32 "1gxq539my98al12bw5952sw9gjq9l4jh71ji9k0naf6kmggwdwaz"))))
     (supported-systems '("x86_64-linux"))
     (build-system binary-build-system)
     (arguments
@@ -170,7 +170,7 @@ its core.")
 (define-public signal-desktop
   (package
     (name "signal-desktop")
-    (version "5.62.0")
+    (version "5.63.1")
     (source
      (origin
        (method url-fetch)
@@ -179,7 +179,7 @@ its core.")
          "https://updates.signal.org/desktop/apt/pool/main/s/" name "/" name "_" version
          "_amd64.deb"))
        (sha256
-        (base32 "0q25wad9jwifvpbr6rvf58kpd2vibx80c9qmhflkz5iqjccp053s"))))
+        (base32 "1y94iikm6ckbs28vpcx4alriypjk14vzaf3sgwyqs4a5cj6rhdzv"))))
     (supported-systems '("x86_64-linux"))
     (build-system binary-build-system)
     (arguments
