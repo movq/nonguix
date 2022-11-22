@@ -119,7 +119,7 @@ System on hardware which requires nonfree software to function.")))
 (define-public linux-firmware
   (package
     (name "linux-firmware")
-    (version "20221012")
+    (version "20221109")
     (source (origin
               (method url-fetch)
               (uri (string-append "https://git.kernel.org/pub/scm/linux/kernel"
@@ -127,7 +127,7 @@ System on hardware which requires nonfree software to function.")))
                                   "linux-firmware-" version ".tar.gz"))
               (sha256
                (base32
-                "0akk38qfkznanpj80jidz4cx8cvs580llb46xd7q1haljykipjys"))))
+                "16yv7snsy5zvcwwzy0sr0lx3nf74qhi3nammdsx8c28rdm19jcn2"))))
     (build-system gnu-build-system)
     (arguments
      `(#:tests? #f
@@ -842,16 +842,15 @@ documented in the respective processor revision guides.")
 (define-public sof-firmware
   (package
     (name "sof-firmware")
-    (version "1.7")
+    (version "2.2.2")
     (source
      (origin
-       (method git-fetch)
-       (uri (git-reference
-             (url "https://github.com/thesofproject/sof-bin")
-             (commit (string-append "v" version))))
-       (file-name (git-file-name name version))
+       (method url-fetch)
+       (uri (string-append "https://github.com/thesofproject/sof-bin/releases/download/v"
+                           version "/sof-bin-v" version ".tar.gz"))
        (sha256
-        (base32 "1fb4rxgg3haxqg2gcm89g7af6v0a0h83c1ar2fyfa8h8pcf7hik7"))))
+        (base32
+         "1h7waw7ia3xjaprlvkcycamphnpcalrr2sjkhm59w7npwclqzwq0"))))
     (build-system copy-build-system)
     (arguments
      `(#:install-plan
