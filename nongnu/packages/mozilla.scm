@@ -74,8 +74,8 @@
 ;; upstream.  See the file taskcluster/ci/toolchain/rust.yml at
 ;; https://searchfox.org under the particular firefox release, like
 ;; mozilla-esr102.
-(define-public rust-firefox-esr rust) ; 1.60 is the default in Guix
-(define-public rust-firefox (@@ (gnu packages rust) rust-1.63)) ; 1.63 is also listed, but 1.61 is the minimum needed
+(define rust-firefox-esr rust) ; 1.60 is the default in Guix
+(define rust-firefox (@@ (gnu packages rust) rust-1.63)) ; 1.63 is also listed, but 1.61 is the minimum needed
 
 ;; rust-cbindgen-0.23/0.24 dependencies
 (define-public rust-unicode-ident-1
