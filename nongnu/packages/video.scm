@@ -1,20 +1,5 @@
-;;; GNU Guix --- Functional package management for GNU
+;;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Copyright © 2022 Jelle Licht <jlicht@fsfe.org>
-;;;
-;;; This file is not part of GNU Guix.
-;;;
-;;; GNU Guix is free software; you can redistribute it and/or modify it
-;;; under the terms of the GNU General Public License as published by
-;;; the Free Software Foundation; either version 3 of the License, or (at
-;;; your option) any later version.
-;;;
-;;; GNU Guix is distributed in the hope that it will be useful, but
-;;; WITHOUT ANY WARRANTY; without even the implied warranty of
-;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;;; GNU General Public License for more details.
-;;;
-;;; You should have received a copy of the GNU General Public License
-;;; along with GNU Guix.  If not, see <http://www.gnu.org/licenses/>.
 
 (define-module (nongnu packages video)
   #:use-module (gnu packages pkg-config)
@@ -28,7 +13,7 @@
 (define-public gmmlib
   (package
     (name "gmmlib")
-    (version "22.1.3")
+    (version "22.2.0")
     (source (origin
               (method git-fetch)
               (uri (git-reference
@@ -37,7 +22,7 @@
               (file-name (git-file-name name version))
               (sha256
                (base32
-                "10gk8bi8xa2bgiqmjbphb9acvbmvgwv9kg0z75cfxazlsx5k7jb1"))))
+		"0cn8pkb7ahmdmj4m6nd0l8s91pz43snnjjp7vhzbmqa8hsp8wbav"))))
     (build-system cmake-build-system)
     (arguments
      ;; Tests are run as part of the normal build step
@@ -53,7 +38,7 @@ for VAAPI.")
 (define-public intel-media-driver
   (package
     (name "intel-media-driver")
-    (version "22.2.2")
+    (version "22.5.4")
     (source (origin
               (method git-fetch)
               (uri (git-reference
@@ -62,7 +47,7 @@ for VAAPI.")
               (file-name (git-file-name name version))
               (sha256
                (base32
-                "1wvx3kvsdq7n5khl0pf7hf1ks4lwqnyjdq8sbjhd7irs3v3prj4j"))))
+		 "0pdmw5357yl9qjw5i9112v5ny19ymi85kl03jd882qcygna3sf8q"))))
     (build-system cmake-build-system)
     (inputs (list libva gmmlib))
     (native-inputs (list pkg-config))
@@ -86,3 +71,5 @@ for VAAPI.")
 accelerated decoding, encoding, and video post processing for the GEN based
 graphics hardware.")
     (license (list license:expat license:bsd-3))))
+
+intel-media-driver

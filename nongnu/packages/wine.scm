@@ -1,20 +1,5 @@
-;;; GNU Guix --- Functional package management for GNU
+;;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Copyright © 2019 Pierre Neidhardt <mail@ambrevar.xyz>
-;;;
-;;; This file is not part of GNU Guix.
-;;;
-;;; GNU Guix is free software; you can redistribute it and/or modify it
-;;; under the terms of the GNU General Public License as published by
-;;; the Free Software Foundation; either version 3 of the License, or (at
-;;; your option) any later version.
-;;;
-;;; GNU Guix is distributed in the hope that it will be useful, but
-;;; WITHOUT ANY WARRANTY; without even the implied warranty of
-;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;;; GNU General Public License for more details.
-;;;
-;;; You should have received a copy of the GNU General Public License
-;;; along with GNU Guix.  If not, see <http://www.gnu.org/licenses/>.
 
 (define-module (nongnu packages wine)
   #:use-module (ice-9 match)
@@ -216,8 +201,8 @@ Use @command{setup_dxvk} to install the required libraries to a Wine prefix.")
 ;; See https://github.com/doitsujin/dxvk/releases/tag/v2.0
 (define-public dxvk-1.10
   (package
-    (inherit dxvk)
-    (version "1.10.1")
+    (inherit dxvk-1.7)
+    (version "1.10.3")
     (home-page "https://github.com/doitsujin/dxvk/")
     (source (origin
               (method url-fetch)
@@ -226,4 +211,4 @@ Use @command{setup_dxvk} to install the required libraries to a Wine prefix.")
                     version "/dxvk-" version ".tar.gz"))
               (sha256
                (base32
-                "1ah7nci49ipaj7z7zac4dqbrxq1ic3zyky42kkid8wqarf198d6w"))))))
+                "1ijkznb8asqg18blhs6f82g67xpncjp7i17rg7451d314y8kq6ld"))))))

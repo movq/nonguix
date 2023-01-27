@@ -1,23 +1,7 @@
-;;; GNU Guix --- Functional package management for GNU
+;;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Copyright © 2021, 2022 PantherX OS Team <team@pantherx.org>
-;;; Copyright © 2022 John Kehayias <john.kehayias@protonmail.com>
+;;; Copyright © 2022, 2023 John Kehayias <john.kehayias@protonmail.com>
 ;;; Copyright © 2022 Evgenii Lepikhin <johnlepikhin@gmail.com>
-;;;
-;;; This file is not part of GNU Guix.
-;;;
-;;; GNU Guix is free software; you can redistribute it and/or modify it
-;;; under the terms of the GNU General Public License as published by
-;;; the Free Software Foundation; either version 3 of the License, or (at
-;;; your option) any later version.
-;;;
-;;; GNU Guix is distributed in the hope that it will be useful, but
-;;; WITHOUT ANY WARRANTY; without even the implied warranty of
-;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;;; GNU General Public License for more details.
-;;;
-;;; You should have received a copy of the GNU General Public License
-;;; along with GNU Guix.  If not, see <http://www.gnu.org/licenses/>.
-
 
 (define-module (nongnu packages messaging)
   #:use-module (gnu packages base)
@@ -50,7 +34,7 @@
 (define-public element-desktop
   (package
     (name "element-desktop")
-    (version "1.11.14")
+    (version "1.11.17")
     (source
      (origin
        (method url-fetch)
@@ -59,7 +43,7 @@
          "https://packages.riot.im/debian/pool/main/e/" name "/" name "_" version
          "_amd64.deb"))
        (sha256
-        (base32 "1gxq539my98al12bw5952sw9gjq9l4jh71ji9k0naf6kmggwdwaz"))))
+        (base32 "0by2ci5bbc42v71vsqrdigiv0ywqnpdd5mh63pgl9n7kmxqfdzhl"))))
     (supported-systems '("x86_64-linux"))
     (build-system binary-build-system)
     (arguments
@@ -170,7 +154,7 @@ its core.")
 (define-public signal-desktop
   (package
     (name "signal-desktop")
-    (version "5.63.1")
+    (version "6.2.0")
     (source
      (origin
        (method url-fetch)
@@ -179,7 +163,7 @@ its core.")
          "https://updates.signal.org/desktop/apt/pool/main/s/" name "/" name "_" version
          "_amd64.deb"))
        (sha256
-        (base32 "1y94iikm6ckbs28vpcx4alriypjk14vzaf3sgwyqs4a5cj6rhdzv"))))
+        (base32 "1ms2fv6hmg17vggbv3f2a730kvk15iz2nqbrn9mkwghabhr9rqva"))))
     (supported-systems '("x86_64-linux"))
     (build-system binary-build-system)
     (arguments
@@ -285,14 +269,14 @@ or iOS.")
 (define-public zoom
   (package
     (name "zoom")
-    (version "5.12.2.4816")
+    (version "5.13.4.711")
     (source
      (origin
        (method url-fetch)
        (uri (string-append "https://cdn.zoom.us/prod/" version "/zoom_x86_64.tar.xz"))
        (file-name (string-append name "-" version "-x86_64.tar.xz"))
        (sha256
-        (base32 "0vxlvxp0jzpc5xsh9wlxc74466i5ipg3fwpi0kv03rl8ib8y1n7p"))))
+        (base32 "0528ywkjl50vd0m0isxicg9mn5fv1w3lqrc10nkynb29hcqlacgv"))))
     (supported-systems '("x86_64-linux"))
     (build-system binary-build-system)
     (arguments
