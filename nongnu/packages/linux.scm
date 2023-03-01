@@ -19,6 +19,7 @@
 ;;; Copyright © 2022 Simen Endsjø <simendsjo@gmail.com>
 ;;; Copyright © 2022 Leo Famulari <leo@famulari.name>
 ;;; Copyright © 2023 Morgan Smith <Morgan.J.Smith@outlook.com>
+;;; Copyright © 2023 Jelle Licht <jlicht@fsfe.org>
 
 (define-module (nongnu packages linux)
   #:use-module (gnu packages)
@@ -37,28 +38,53 @@
   #:use-module (guix build-system trivial)
   #:use-module (ice-9 match)
   #:use-module (nonguix licenses)
+  #:use-module (srfi srfi-1)
   #:export (corrupt-linux))
 
-(define (linux-urls version)
-  "Return a list of URLS for Linux VERSION."
-  (list (string-append "https://www.kernel.org/pub/linux/kernel/v"
-                       (version-major version) ".x/linux-" version ".tar.xz")))
+(define (linux-url version)
+  "Return a URL for Linux VERSION."
+  (string-append "mirror://kernel.org"
+                       "/linux/kernel/v" (version-major version) ".x"
+                       "/linux-" version ".tar.xz"))
 
 (define* (corrupt-linux freedo #:key (name "linux"))
-  (package
-   (inherit
-    (customize-linux
-     #:name name
-     #:source (origin (inherit (package-source freedo))
-                      (method url-fetch)
-                      (uri (linux-urls (package-version freedo)))
-                      (patches '()))))
-   (version (package-version freedo))
-   (home-page "https://www.kernel.org/")
-   (synopsis "Linux kernel with nonfree binary blobs included")
-   (description
-    "The unmodified Linux kernel, including nonfree blobs, for running Guix
-System on hardware which requires nonfree software to function.")))
+
+  ;; TODO: This very directly depends on guix internals.
+  ;; Throw it all out when we manage kernel hashes.
+  (define gexp-inputs (@@ (guix gexp) gexp-inputs))
+
+  (define extract-gexp-inputs
+    (compose gexp-inputs force origin-uri))
+
+  (define (find-source-hash sources url)
+    (let ((versioned-origin
+           (find (lambda (source)
+                   (let ((uri (origin-uri source)))
+                     (and (string? uri) (string=? uri url)))) sources)))
+      (if versioned-origin
+          (origin-hash versioned-origin)
+          #f)))
+
+  (let* ((version (package-version freedo))
+         (url (linux-url version))
+         (pristine-source (package-source freedo))
+         (inputs (map gexp-input-thing (extract-gexp-inputs pristine-source)))
+         (sources (filter origin? inputs))
+         (hash (find-source-hash sources url)))
+    (package
+      (inherit
+       (customize-linux
+        #:name name
+        #:source (origin
+                   (method url-fetch)
+                   (uri url)
+                   (hash hash))))
+      (version version)
+      (home-page "https://www.kernel.org/")
+      (synopsis "Linux kernel with nonfree binary blobs included")
+      (description
+       "The unmodified Linux kernel, including nonfree blobs, for running Guix System
+on hardware which requires nonfree software to function."))))
 
 (define-public linux-6.1
   (corrupt-linux linux-libre-6.1))
@@ -95,15 +121,14 @@ System on hardware which requires nonfree software to function.")))
 (define-public linux-firmware
   (package
     (name "linux-firmware")
-    (version "20221214")
+    (version "20230117")
     (source (origin
               (method url-fetch)
-              (uri (string-append "https://git.kernel.org/pub/scm/linux/kernel"
-                                  "/git/firmware/linux-firmware.git/snapshot/"
-                                  "linux-firmware-" version ".tar.gz"))
+              (uri (string-append "mirror://kernel.org/linux/kernel/firmware/"
+                                  "linux-firmware-" version ".tar.xz"))
               (sha256
                (base32
-                "1f93aq0a35niv8qv8wyy033palpplbgr2cq0vihb97wxfkk5wmr2"))))
+                "0r1xrgq512031xz1ysx2a295kvsc7dxf2mrp8x1m6kgvl9dy44fz"))))
     (build-system gnu-build-system)
     (arguments
      `(#:tests? #f
@@ -877,7 +902,7 @@ chipsets from Broadcom:
 (define-public intel-microcode
   (package
     (name "intel-microcode")
-    (version "20221108")
+    (version "20230214")
     (source
      (origin
        (method git-fetch)
@@ -888,7 +913,7 @@ chipsets from Broadcom:
              (commit (string-append "microcode-" version))))
        (file-name (git-file-name name version))
        (sha256
-        (base32 "1na797jixcwj27brzfy24lwgndc041kbnf1wh1l047nz7nnc35i5"))))
+        (base32 "047m1c7bap19cqxpqy2xlzngn8i8jfk44ffbkmkhw4nfrval81sb"))))
     (build-system copy-build-system)
     (arguments
      `(#:install-plan
@@ -951,44 +976,3 @@ audio DSPs that can be found on the Intel Skylake architecture.  This
 firmware can be built from source but need to be signed by Intel in order to be
 loaded by Linux.")
     (license bsd-3)))
-
-(define-public rtl8821ce-linux-module
-  (let ((commit "50c1b120b06a3b0805e23ca9a4dbd274d74bb305")
-        (revision "8"))
-    (package
-      (name "rtl8821ce-linux-module")
-      (version (git-version "0.0.0" revision commit))
-      (source
-       (origin
-         (method git-fetch)
-         (uri (git-reference
-               (url "https://github.com/tomaspinho/rtl8821ce")
-               (commit commit)))
-         (file-name (git-file-name name version))
-         (sha256
-          (base32
-           "09dsmbsrpnbpbq4kigq324s8xb567pdjyb5h07kg6xcbcb5npkpz"))))
-      (build-system linux-module-build-system)
-      (arguments
-       (list #:make-flags
-             #~(list (string-append "CC=" #$(cc-for-target))
-                     (string-append "KSRC="
-                                    (assoc-ref %build-inputs
-                                               "linux-module-builder")
-                                    "/lib/modules/build"))
-             #:phases
-             #~(modify-phases %standard-phases
-                 (replace 'build
-                   (lambda* (#:key (make-flags '()) (parallel-build? #t)
-                                   #:allow-other-keys)
-                     (apply invoke "make"
-                            `(,@(if parallel-build?
-                                    `("-j" ,(number->string (parallel-job-count)))
-                                    '())
-                              ,@make-flags)))))
-             #:tests? #f))                  ; no test suite
-      (home-page "https://github.com/tomaspinho/rtl8821ce")
-      (synopsis "Linux driver for Realtek RTL8821CE wireless network adapters")
-      (description "This is Realtek's RTL8821CE Linux driver for wireless
-network adapters.")
-      (license gpl2))))

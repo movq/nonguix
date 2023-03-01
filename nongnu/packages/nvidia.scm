@@ -4,7 +4,7 @@
 ;;; Copyright © 2020, 2021 Jean-Baptiste Volatier <jbv@pm.me>
 ;;; Copyright © 2020-2022 Jonathan Brielmaier <jonathan.brielmaier@web.de>
 ;;; Copyright © 2021 Pierre Langlois <pierre.langlois@gmx.com>
-;;; Copyright © 2022 Petr Hodina <phodina@protonmail.com>
+;;; Copyright © 2022, 2023 Petr Hodina <phodina@protonmail.com>
 ;;; Copyright © 2022 Alexey Abramov <levenson@mmer.org>
 ;;; Copyright © 2022 Hilton Chain <hako@ultrarare.space>
 
@@ -18,12 +18,15 @@
   #:use-module ((guix licenses) #:prefix license-gnu:)
   #:use-module ((nonguix licenses) #:prefix license:)
   #:use-module (guix build-system linux-module)
+  #:use-module (guix build-system cmake)
   #:use-module (guix build-system copy)
   #:use-module (guix build-system gnu)
+  #:use-module (guix build-system python)
   #:use-module (guix build-system trivial)
   #:use-module (gnu packages base)
   #:use-module (gnu packages bash)
   #:use-module (gnu packages bootstrap)
+  #:use-module (gnu packages check)
   #:use-module (gnu packages compression)
   #:use-module (gnu packages elf)
   #:use-module (gnu packages freedesktop)
@@ -38,9 +41,14 @@
   #:use-module (gnu packages perl)
   #:use-module (gnu packages pkg-config)
   #:use-module (gnu packages python)
+  #:use-module (gnu packages python-xyz)
+  #:use-module (gnu packages python-web)
+  #:use-module (gnu packages qt)
+  #:use-module (gnu packages terminals)
   #:use-module (gnu packages video)
   #:use-module (gnu packages web)
   #:use-module (gnu packages xdisorg)
+  #:use-module (gnu packages xml)
   #:use-module (gnu packages xorg)
   #:use-module (nongnu packages linux)
   #:use-module (ice-9 match)
@@ -95,6 +103,111 @@
              version "/NVIDIA-Linux-x86_64-" version ".run"))
        (sha256
         (base32 "0i5zyvlsjnfkpfqhw6pklp0ws8nndyiwxrg4pj04jpwnxf6a38n6"))))))
+
+(define-public gpustat
+  (package
+    (name "gpustat")
+    (version "1.0.0")
+    (source (origin
+              (method url-fetch)
+              (uri (pypi-uri "gpustat" version))
+              (sha256
+               (base32
+                "1wg3yikkqdrcxp5xscyb9rxifgfwv7qh73xv4airab63b3w8y7jq"))))
+    (build-system python-build-system)
+    (arguments
+     '(#:tests? #f))
+    (propagated-inputs (list python-blessed python-nvidia-ml-py python-psutil
+                             python-six))
+    (native-inputs (list python-mock python-pytest python-pytest-runner))
+    (home-page "https://github.com/wookayin/gpustat")
+    (synopsis "Utility to monitor NVIDIA GPU status and usage")
+    (description
+     "This package provides an utility to monitor NVIDIA GPU status
+and usage.")
+    (license license-gnu:expat)))
+
+(define-public python-nvidia-ml-py
+  (package
+    (name "python-nvidia-ml-py")
+    (version "11.495.46")
+    (source (origin
+              (method url-fetch)
+              (uri (pypi-uri "nvidia-ml-py" version))
+              (sha256
+               (base32
+                "09cnb7xasd7brby52j70y7fqsfm9n6gvgqf769v0cmj74ypy2s4g"))))
+    (build-system python-build-system)
+    (arguments
+     (list #:phases #~(modify-phases %standard-phases
+                        (add-after 'unpack 'fix-libnvidia
+                          (lambda _
+                            (substitute* "pynvml.py"
+                              (("libnvidia-ml.so.1")
+                               (string-append #$(this-package-input
+                                                 "nvidia-driver")
+                                              "/lib/libnvidia-ml.so.1"))))))))
+    (inputs (list nvidia-driver))
+    (home-page "https://forums.developer.nvidia.com")
+    (synopsis "Python Bindings for the NVIDIA Management Library")
+    (description "This package provides official Python Bindings for the NVIDIA
+Management Library")
+    (license license-gnu:bsd-3)))
+
+(define-public nvidia-htop
+  (package
+    (name "nvidia-htop")
+    (version "1.0.5")
+    (source (origin
+              (method url-fetch)
+              (uri (pypi-uri "nvidia-htop" version))
+              (sha256
+               (base32
+                "0lv9cpccpkbg0d577irm1lp9rx6pacyk2pk9v41k9s9hyl4b7hvx"))))
+    (build-system python-build-system)
+    (arguments
+     (list #:phases #~(modify-phases %standard-phases
+                        (add-after 'unpack 'fix-libnvidia
+                          (lambda _
+                            (substitute* "nvidia-htop.py"
+                              (("nvidia-smi")
+                               (string-append #$(this-package-input
+                                                 "nvidia-driver")
+                                              "/bin/nvidia-smi"))))))))
+    (inputs (list nvidia-driver))
+    (propagated-inputs (list python-termcolor))
+    (home-page "https://github.com/peci1/nvidia-htop")
+    (synopsis "Tool to enrich the output of nvidia-smi")
+    (description "This package provides tool for enriching the output of
+nvidia-smi.")
+    (license license-gnu:bsd-3)))
+
+(define-public python-py3nvml
+  (package
+    (name "python-py3nvml")
+    (version "0.2.7")
+    (source (origin
+              (method url-fetch)
+              (uri (pypi-uri "py3nvml" version))
+              (sha256
+               (base32
+                "0wxxky9amy38q7qjsdmmznk1kqdzwd680ps64i76cvlab421vvh9"))))
+    (build-system python-build-system)
+    (arguments
+     (list #:phases #~(modify-phases %standard-phases
+                        (add-after 'unpack 'fix-libnvidia
+                          (lambda _
+                            (substitute* "py3nvml/py3nvml.py"
+                              (("libnvidia-ml.so.1")
+                               (string-append #$(this-package-input
+                                                 "nvidia-driver")
+                                              "/lib/libnvidia-ml.so.1"))))))))
+    (propagated-inputs (list nvidia-driver python-xmltodict))
+    (home-page "https://github.com/fbcotter/py3nvml")
+    (synopsis "Unoffcial Python 3 Bindings for the NVIDIA Management Library")
+    (description "This package provides unofficial Python 3 Bindings for the
+NVIDIA Management Library")
+    (license license-gnu:bsd-3)))
 
 (define-public nvidia-driver
   (package
@@ -463,6 +576,48 @@ userspace tools from the corresponding driver release.")
 configuration, creating application profiles, gpu monitoring and more.")
     (home-page "https://github.com/NVIDIA/nvidia-settings")
     (license license-gnu:gpl2)))
+
+(define-public nvidia-system-monitor
+  (package
+    (name "nvidia-system-monitor")
+    (version "1.5")
+    (source (origin
+              (method git-fetch)
+              (uri (git-reference
+                    (url "https://github.com/congard/nvidia-system-monitor-qt")
+                    (commit (string-append "v" version))))
+              (file-name (git-file-name name version))
+              (sha256
+               (base32
+                "0aghdqljvjmc02g9jpc7sb3yhha738ywny51riska56hkxd3jg2l"))))
+    (build-system cmake-build-system)
+    (arguments
+     (list #:tests? #f
+           #:phases #~(modify-phases %standard-phases
+                        (add-after 'unpack 'fix-nvidia-smi
+                          (lambda _
+                            (let ((nvidia-smi (string-append #$(this-package-input
+                                                                "nvidia-driver")
+                                               "/bin/nvidia-smi")))
+                              (substitute* "src/core/InfoProvider.cpp"
+                                (("nvidia-smi")
+                                 nvidia-smi))
+                              (substitute* "src/main.cpp"
+                                (("which nvidia-smi")
+                                 (string-append "which " nvidia-smi))
+                                (("exec..nvidia-smi")
+                                 (string-append "exec(\"" nvidia-smi))))))
+                        (replace 'install
+                          (lambda* (#:key outputs #:allow-other-keys)
+                            (let ((bin (string-append #$output "/bin")))
+                              (mkdir-p bin)
+                              (install-file "qnvsm" bin)))))))
+    (inputs (list qtbase-5 qtdeclarative-5 nvidia-driver))
+    (home-page "https://github.com/congard/nvidia-system-monitor-qt")
+    (synopsis "Task manager for Nvidia graphics cards")
+    (description
+     "This package provides a task manager for Nvidia graphics cards.")
+    (license license-gnu:expat)))
 
 ;; nvda is used as a name because it has the same length as mesa which is
 ;; required for grafting

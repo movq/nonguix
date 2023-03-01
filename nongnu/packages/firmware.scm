@@ -53,7 +53,8 @@
                   "19xmkdvlkczc6zgigy8jdbgnp37i6pc03m2cm3gilvzg8m7v18ad"))))
       (build-system copy-build-system)
       (arguments
-       `(#:install-plan '(("ov5640_af.bin" "lib/firmware/"))))
+       `(#:substitutable? #f
+         #:install-plan '(("ov5640_af.bin" "lib/firmware/"))))
       (synopsis "Firmware for the OV5640 sensor in the PinePhone")
       (description "This package provides binary firmware for the 0V5640 sensor
 in the PinePhone.")
@@ -77,7 +78,8 @@ in the PinePhone.")
                   "19xmkdvlkczc6zgigy8jdbgnp37i6pc03m2cm3gilvzg8m7v18ad"))))
       (build-system copy-build-system)
       (arguments
-       `(#:install-plan '(("rtl_bt/rtl8723cs_xx_fw.bin" "lib/firmware/"))))
+       `(#:substitutable? #f
+         #:install-plan '(("rtl_bt/rtl8723cs_xx_fw.bin" "lib/firmware/"))))
       (synopsis "Firmware for the RTL8723BS/CS")
       (description "This package provides binary firmware for the RTL8723BS/CS
 WiFi/Bluetooth chip in the PinePhone.")
@@ -101,7 +103,8 @@ WiFi/Bluetooth chip in the PinePhone.")
                   "19xmkdvlkczc6zgigy8jdbgnp37i6pc03m2cm3gilvzg8m7v18ad"))))
       (build-system copy-build-system)
       (arguments
-       `(#:install-plan '(("anx7688-fw.bin" "lib/firmware/"))))
+       `(#:substitutable? #f
+         #:install-plan '(("anx7688-fw.bin" "lib/firmware/"))))
       (synopsis "Firmware for the ANX7688")
       (description "This package provides binary firmware for the ANX7688
 HDMI to USB Type-C Bridge in the PinePhone.")
@@ -126,7 +129,8 @@ HDMI to USB Type-C Bridge in the PinePhone.")
                   "1s52rpikw0gysph5lq7vr6b3nsxczg4ikgil9zdgmcknjnxk9kbv"))))
       (build-system copy-build-system)
       (arguments
-       `(#:install-plan '( ;Bluetooth firmware
+       `(#:substitutable? #f
+         #:install-plan '( ;Bluetooth firmware
                            ("BCM4345C5.hcd" "usr/lib/firmware/brcm/")
                           ;; WiFi firmware
                           ("fw_bcm43456c5_ag.bin" "usr/lib/firmware/brcm/")

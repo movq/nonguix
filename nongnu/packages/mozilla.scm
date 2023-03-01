@@ -14,7 +14,7 @@
 ;;; Copyright © 2020 Oleg Pykhalov <go.wigust@gmail.com>
 ;;; Copyright © 2020 Jakub Kądziołka <kuba@kadziolka.net>
 ;;; Copyright © 2019, 2020 Adrian Malacoda <malacoda@monarch-pass.net>
-;;; Copyright © 2020-2022 Jonathan Brielmaier <jonathan.brielmaier@web.de>
+;;; Copyright © 2020-2023 Jonathan Brielmaier <jonathan.brielmaier@web.de>
 ;;; Copyright © 2020 Zhu Zihao <all_but_last@163.com>
 ;;; Copyright © 2021 pineapples <guixuser6392@protonmail.com>
 ;;; Copyright © 2021 Brice Waegeneire <brice@waegenei.re>
@@ -74,8 +74,8 @@
 ;; upstream.  See the file taskcluster/ci/toolchain/rust.yml at
 ;; https://searchfox.org under the particular firefox release, like
 ;; mozilla-esr102.
-(define rust-firefox-esr rust) ; 1.60 is the default in Guix
-(define rust-firefox (@@ (gnu packages rust) rust-1.63)) ; 1.63 is also listed, but 1.61 is the minimum needed
+(define-public rust-firefox-esr rust) ; 1.60 is the default in Guix
+(define-public rust-firefox (@@ (gnu packages rust) rust-1.65)) ; 1.63 is also listed, but 1.61 is the minimum needed
 
 ;; rust-cbindgen-0.23/0.24 dependencies
 (define-public rust-unicode-ident-1
@@ -231,21 +231,37 @@ according to Unicode Standard Annex #31")
                (base32
                 "006rn3fn4njayjxr2vd24g1awssr9i3894nbmfzkybx07j728vav"))))))
 
+(define icu4c-72
+  (package
+    (inherit icu4c)
+    (version "72.1")
+    (source (origin
+              (method url-fetch)
+              (uri (string-append
+                    "https://github.com/unicode-org/icu/releases/download/release-"
+                    (string-map (lambda (x) (if (char=? x #\.) #\- x)) version)
+                    "/icu4c-"
+                    (string-map (lambda (x) (if (char=? x #\.) #\_ x)) version)
+                    "-src.tgz"))
+              (sha256
+               (base32
+                "0s0xly0ndspd4p9jl6101qvnp5rgz5kl9qrmcvapwah92y1d7lm2"))))))
+
 ;; Update this id with every firefox update to it's release date.
 ;; It's used for cache validation and therefor can lead to strange bugs.
-(define %firefox-esr-build-id "20230117000000")
+(define %firefox-esr-build-id "20230214000000")
 
 (define-public firefox-esr
   (package
     (name "firefox-esr")
-    (version "102.7.0esr")
+    (version "102.8.0esr")
     (source
      (origin
        (method url-fetch)
        (uri (string-append "https://archive.mozilla.org/pub/firefox/releases/"
                            version "/source/firefox-" version ".source.tar.xz"))
        (sha256
-        (base32 "1ahl66x8chnsz80capqa5ivyrqhc50s91zrcgz1jxd7w2ws61957"))))
+        (base32 "0j6afrgfsmd0adbbmffw4p1f2hznpck9d36z3bsjx36f7cjgdy27"))))
     (build-system gnu-build-system)
     (arguments
      (list
@@ -650,20 +666,20 @@ MOZ_ENABLE_WAYLAND=1 exec ~a $@\n"
 
 ;; Update this id with every firefox update to it's release date.
 ;; It's used for cache validation and therefor can lead to strange bugs.
-(define %firefox-build-id "20230117000000")
+(define %firefox-build-id "20230228000000")
 
 (define-public firefox
   (package
     (inherit firefox-esr)
     (name "firefox")
-    (version "109.0")
+    (version "110.0.1")
     (source
      (origin
        (method url-fetch)
        (uri (string-append "https://archive.mozilla.org/pub/firefox/releases/"
                            version "/source/firefox-" version ".source.tar.xz"))
        (sha256
-        (base32 "0lcklrv619b3kda8xh52bqggib1nn8jkm4phhpxr4n9bawxs0y06"))))
+        (base32 "07s9k34py05sa4nx1dayg394r5wqc5vzas6amcjjd6abd16vg6zi"))))
     (arguments
      (substitute-keyword-arguments (package-arguments firefox-esr)
        ((#:phases phases)
@@ -671,6 +687,9 @@ MOZ_ENABLE_WAYLAND=1 exec ~a $@\n"
             (replace 'set-build-id
               (lambda _
                 (setenv "MOZ_BUILD_DATE" #$%firefox-build-id)))))))
+    (inputs
+     (modify-inputs (package-inputs firefox-esr)
+       (replace "icu4c" icu4c-72)))
     (native-inputs
      (modify-inputs (package-native-inputs firefox-esr)
        (replace "rust" rust-firefox)
