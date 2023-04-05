@@ -15,10 +15,10 @@
   #:use-module (gnu packages glib)
   #:use-module (gnu packages gnome)
   #:use-module (gnu packages gtk)
+  #:use-module (gnu packages kerberos)
   #:use-module (gnu packages linux)
   #:use-module (gnu packages nss)
   #:use-module (gnu packages pulseaudio)
-  #:use-module (gnu packages qt)
   #:use-module (gnu packages xdisorg)
   #:use-module (gnu packages xml)
   #:use-module (gnu packages xorg)
@@ -34,7 +34,7 @@
 (define-public element-desktop
   (package
     (name "element-desktop")
-    (version "1.11.17")
+    (version "1.11.24")
     (source
      (origin
        (method url-fetch)
@@ -43,7 +43,7 @@
          "https://packages.riot.im/debian/pool/main/e/" name "/" name "_" version
          "_amd64.deb"))
        (sha256
-        (base32 "0by2ci5bbc42v71vsqrdigiv0ywqnpdd5mh63pgl9n7kmxqfdzhl"))))
+        (base32 "1bqhsimvchphjaha1vwj12xrrp8cy5bmvv1ha5nyifih8nk8k3l4"))))
     (supported-systems '("x86_64-linux"))
     (build-system binary-build-system)
     (arguments
@@ -154,7 +154,7 @@ its core.")
 (define-public signal-desktop
   (package
     (name "signal-desktop")
-    (version "6.2.0")
+    (version "6.12.0")
     (source
      (origin
        (method url-fetch)
@@ -163,7 +163,7 @@ its core.")
          "https://updates.signal.org/desktop/apt/pool/main/s/" name "/" name "_" version
          "_amd64.deb"))
        (sha256
-        (base32 "1ms2fv6hmg17vggbv3f2a730kvk15iz2nqbrn9mkwghabhr9rqva"))))
+        (base32 "16i8w1ba6y794c5xxv8rvk4vc7i598hiq4m9v4379rq40z3jn5cy"))))
     (supported-systems '("x86_64-linux"))
     (build-system binary-build-system)
     (arguments
@@ -269,19 +269,21 @@ or iOS.")
 (define-public zoom
   (package
     (name "zoom")
-    (version "5.13.4.711")
+    (version "5.13.11.1288")
     (source
      (origin
        (method url-fetch)
        (uri (string-append "https://cdn.zoom.us/prod/" version "/zoom_x86_64.tar.xz"))
        (file-name (string-append name "-" version "-x86_64.tar.xz"))
        (sha256
-        (base32 "0528ywkjl50vd0m0isxicg9mn5fv1w3lqrc10nkynb29hcqlacgv"))))
+        (base32 "1ngj15j9d7i0z4d0wraziyv75whp0digh8rg1jzfmi0ws3ir2d6b"))))
     (supported-systems '("x86_64-linux"))
     (build-system binary-build-system)
     (arguments
      (list #:validate-runpath? #f ; TODO: fails on wrapped binary and included other files
            #:patchelf-plan
+           ;; Note: it seems like some (all?) of these only do anything in
+           ;; LD_LIBRARY_PATH, or at least needed there as well.
            #~(let ((libs '("alsa-lib"
                            "at-spi2-atk"
                            "at-spi2-core"
@@ -321,6 +323,8 @@ or iOS.")
                 ("lib/zoom/zoom"
                  ,libs)
                 ("lib/zoom/zopen"
+                 ,libs)
+                ("lib/zoom/aomhost"
                  ,libs)))
            #:phases
            #~(modify-phases %standard-phases
@@ -358,6 +362,10 @@ or iOS.")
                        ,(list (string-append #$(this-package-input "nss") "/lib/nss")
                               #$@(map (lambda (pkg)
                                         (file-append (this-package-input pkg) "/lib"))
+                                      ;; TODO: Reuse this long list as it is
+                                      ;; needed for aomhost.  Or perhaps
+                                      ;; aomhost has a shorter needed list,
+                                      ;; but untested.
                                       '("alsa-lib"
                                         "atk"
                                         "at-spi2-atk"
@@ -370,15 +378,60 @@ or iOS.")
                                         "gcc"
                                         "glib"
                                         "mesa"
+                                        "mit-krb5"
                                         "nspr"
+                                        "libxcb"
                                         "libxcomposite"
                                         "libxdamage"
+                                        "libxext"
                                         "libxkbcommon"
                                         "libxkbfile"
                                         "libxrandr"
                                         "libxshmfence"
                                         "pango"
                                         "pulseaudio"
+                                        "xcb-util"
+                                        "xcb-util-wm"
+                                        "xcb-util-renderutil"
+                                        "zlib")))))
+                   (wrap-program (string-append #$output "/lib/zoom/aomhost")
+                     `("FONTCONFIG_PATH" ":" prefix
+                       (,(string-join
+                          (list
+                           (string-append #$(this-package-input "fontconfig-minimal") "/etc/fonts")
+                           #$output)
+                          ":")))
+                     `("LD_LIBRARY_PATH" prefix
+                       ,(list (string-append #$(this-package-input "nss") "/lib/nss")
+                              #$@(map (lambda (pkg)
+                                        (file-append (this-package-input pkg) "/lib"))
+                                      '("alsa-lib"
+                                        "atk"
+                                        "at-spi2-atk"
+                                        "at-spi2-core"
+                                        "cairo"
+                                        "cups"
+                                        "dbus"
+                                        "eudev"
+                                        "expat"
+                                        "gcc"
+                                        "glib"
+                                        "mesa"
+                                        "mit-krb5"
+                                        "nspr"
+                                        "libxcb"
+                                        "libxcomposite"
+                                        "libxdamage"
+                                        "libxext"
+                                        "libxkbcommon"
+                                        "libxkbfile"
+                                        "libxrandr"
+                                        "libxshmfence"
+                                        "pango"
+                                        "pulseaudio"
+                                        "xcb-util"
+                                        "xcb-util-wm"
+                                        "xcb-util-renderutil"
                                         "zlib")))))))
                (add-after 'wrap-where-patchelf-does-not-work 'rename-binary
                  ;; IPC (for single sign-on and handling links) fails if the
@@ -394,6 +447,8 @@ or iOS.")
                  (lambda _
                    (delete-file (string-append #$output "/environment-variables"))
                    (mkdir-p (string-append #$output "/bin"))
+                   (symlink (string-append #$output "/lib/zoom/aomhost")
+                            (string-append #$output "/bin/aomhost"))
                    (symlink (string-append #$output "/lib/zoom/zoom")
                             (string-append #$output "/bin/zoom"))
                    (symlink (string-append #$output "/lib/zoom/zopen")
@@ -452,13 +507,16 @@ or iOS.")
                   libxrender
                   libxshmfence
                   mesa
+                  mit-krb5
                   nspr
                   nss
                   pango
                   pulseaudio
-                  qtmultimedia
+                  xcb-util
                   xcb-util-image
                   xcb-util-keysyms
+                  xcb-util-renderutil
+                  xcb-util-wm
                   zlib))
     (home-page "https://zoom.us/")
     (synopsis "Video conference client")
