@@ -20,6 +20,7 @@
 ;;; Copyright © 2021 Brice Waegeneire <brice@waegenei.re>
 ;;; Copyright © 2021, 2022, 2023 John Kehayias <john.kehayias@protonmail.com>
 ;;; Copyright © 2022 Pierre Langlois <pierre.langlois@gmx.com>
+;;; Copyright © 2023 Tomas Volf <wolf@wolfsden.cz>
 
 (define-module (nongnu packages mozilla)
   #:use-module (guix build-system gnu)
@@ -64,6 +65,7 @@
   #:use-module (gnu packages python)
   #:use-module (gnu packages rust)
   #:use-module (gnu packages rust-apps)
+  #:use-module (gnu packages speech)
   #:use-module (gnu packages sqlite)
   #:use-module (gnu packages video)
   #:use-module (nongnu packages wasm)
@@ -75,12 +77,12 @@
 ;; https://searchfox.org under the particular firefox release, like
 ;; mozilla-esr102.
 (define-public rust-firefox-esr rust) ; 1.60 is the default in Guix
-(define-public rust-firefox (@@ (gnu packages rust) rust-1.65)) ; 1.63 is also listed, but 1.61 is the minimum needed
+(define-public rust-firefox rust) ; 1.65 is the minimum
 
-(define icu4c-72
+(define icu4c-73
   (package
     (inherit icu4c)
-    (version "72.1")
+    (version "73.1")
     (source (origin
               (method url-fetch)
               (uri (string-append
@@ -91,23 +93,23 @@
                     "-src.tgz"))
               (sha256
                (base32
-                "0s0xly0ndspd4p9jl6101qvnp5rgz5kl9qrmcvapwah92y1d7lm2"))))))
+                "0iccpdvc0kvpww5a31k9gjkqigyz016i7v80r9zamd34w4fl6mx4"))))))
 
-;; Update this id with every firefox update to it's release date.
-;; It's used for cache validation and therefor can lead to strange bugs.
-(define %firefox-esr-build-id "20230411000000")
+;; Update this id with every firefox update to its release date.
+;; It's used for cache validation and therefore can lead to strange bugs.
+(define %firefox-esr-build-id "20230928000000")
 
 (define-public firefox-esr
   (package
     (name "firefox-esr")
-    (version "102.10.0esr")
+    (version "115.3.1esr")
     (source
      (origin
        (method url-fetch)
        (uri (string-append "https://archive.mozilla.org/pub/firefox/releases/"
                            version "/source/firefox-" version ".source.tar.xz"))
        (sha256
-        (base32 "1y7v19xxl6jchywd0zxy5vr4pj23pi6di4lhlivxpki2pkgm8scc"))))
+        (base32 "0lqymabkhxpdhmgz81if8za1hdakh8nlm4cmsir4y1fa95p2bnkx"))))
     (build-system gnu-build-system)
     (arguments
      (list
@@ -154,6 +156,7 @@
             "--disable-elf-hack"))
       #:imported-modules %cargo-utils-modules
       #:modules `((ice-9 regex)
+                  (ice-9 string-fun)
                   (ice-9 ftw)
                   (srfi srfi-1)
                   (srfi srfi-26)
@@ -230,6 +233,22 @@
               (substitute* "build/RunCbindgen.py"
                 (("\"--frozen\",") ""))))
           (delete 'bootstrap)
+          (add-before 'configure 'patch-SpeechDispatcherService.cpp
+            (lambda _
+              (let* ((lib "libspeechd.so.2")
+                     (file "dom/media/webspeech/synth/speechd/SpeechDispatcherService.cpp")
+                     (old-content (call-with-input-file file get-string-all)))
+                (substitute
+                 file
+                 `((,(format #f "~s" lib)
+                    . ,(λ (line _)
+                         (string-replace-substring
+                          line
+                          lib
+                          (string-append #$speech-dispatcher "/lib/" lib))))))
+                (if (string=? old-content
+                              (call-with-input-file file get-string-all))
+                    (error "substitute did nothing, phase requires an update")))))
           (add-before 'configure 'set-build-id
             ;; Firefox will write the timestamp to output, which is harmful
             ;; for reproducibility, so change it to a fixed date.  Use a
@@ -418,7 +437,7 @@
         gtk+
         gtk+-2
         hunspell
-        icu4c
+        icu4c-73
         jemalloc
         libcanberra
         libevent
@@ -442,8 +461,9 @@
         pipewire
         pixman
         pulseaudio
-        startup-notification
+        speech-dispatcher
         sqlite
+        startup-notification
         eudev
         unzip
         zip
@@ -458,12 +478,12 @@
         wasm32-wasi-clang-toolchain
         m4
         nasm
-        node
+        node-lts
         perl
         pkg-config
         python
         rust-firefox-esr
-        rust-cbindgen-0.23
+        rust-cbindgen-0.24
         which
         yasm))
     (home-page "https://mozilla.org/firefox/")
@@ -510,22 +530,22 @@ MOZ_ENABLE_WAYLAND=1 exec ~a $@\n"
              ((firefox) out))
            #t))))))
 
-;; Update this id with every firefox update to it's release date.
-;; It's used for cache validation and therefor can lead to strange bugs.
-(define %firefox-build-id "20230417000000")
+;; Update this id with every firefox update to its release date.
+;; It's used for cache validation and therefore can lead to strange bugs.
+(define %firefox-build-id "20230928000000")
 
 (define-public firefox
   (package
     (inherit firefox-esr)
     (name "firefox")
-    (version "112.0.1")
+    (version "118.0.1")
     (source
      (origin
        (method url-fetch)
        (uri (string-append "https://archive.mozilla.org/pub/firefox/releases/"
                            version "/source/firefox-" version ".source.tar.xz"))
        (sha256
-        (base32 "0jdnxy3xx4nzs5bn0rqa2v599pp3fp9ra540nxibrq9gh632hasx"))))
+        (base32 "15gxg5nk62fn5sp77i0b0jfn8qa2a3ikkis0lwaxc19ns5bdmx53"))))
     (arguments
      (substitute-keyword-arguments (package-arguments firefox-esr)
        ((#:phases phases)
@@ -533,15 +553,10 @@ MOZ_ENABLE_WAYLAND=1 exec ~a $@\n"
             (replace 'set-build-id
               (lambda _
                 (setenv "MOZ_BUILD_DATE" #$%firefox-build-id)))))))
-    (inputs
-     (modify-inputs (package-inputs firefox-esr)
-       (replace "icu4c" icu4c-72)))
     (native-inputs
      (modify-inputs (package-native-inputs firefox-esr)
        (replace "rust" rust-firefox)
-       (replace "rust:cargo" `(,rust-firefox "cargo"))
-       (replace "node" node-lts)
-       (replace "rust-cbindgen" rust-cbindgen-0.24)))
+       (replace "rust:cargo" `(,rust-firefox "cargo"))))
     (description
      "Full-featured browser client built from Firefox source tree, without
 the official icon and the name \"firefox\".")))

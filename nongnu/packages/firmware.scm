@@ -1,8 +1,11 @@
 ;;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;; Copyright © 2022-2023 Jonathan Brielmaier <jonathan.brielmaier@web.de>
 ;;; Copyright © 2022 Petr Hodina <phodina@protonmail.com>
+;;; Copyright © 2023 Krzysztof Baranowski <pharcosyle@gmail.com>
 
 (define-module (nongnu packages firmware)
+  #:use-module (gnu packages compression)
+  #:use-module (gnu packages cpio)
   #:use-module (gnu packages efi)
   #:use-module (gnu packages firmware)
   #:use-module (guix build-system copy)
@@ -13,7 +16,8 @@
   #:use-module ((guix licenses) #:prefix guix-license:)
   #:use-module (guix packages)
   #:use-module (guix utils)
-  #:use-module (nonguix licenses))
+  #:use-module (nonguix licenses)
+  #:use-module (nongnu packages compression))
 
 ;; fwupd with LVFS nonfree repositories enabled
 (define-public fwupd-nonfree
@@ -176,3 +180,127 @@ and STLC2300 Bluetooth chips.")
     (license (list guix-license:gpl2+
                    (nonfree
                     "file:///share/doc/bluez-firmware-1.2/BCM-LEGAL.txt")))))
+
+(define dump-file-chunk
+  #~(lambda (in out count start)
+      (use-modules (rnrs io ports))
+      (call-with-output-file out
+        (lambda (out-port)
+          (put-bytevector
+           out-port
+           (call-with-input-file in
+             (lambda (in-port)
+               (seek in-port start SEEK_SET)
+               (get-bytevector-n in-port count))))))))
+
+(define-public facetimehd-firmware
+  (package
+    (name "facetimehd-firmware")
+    (version "1.43")
+    (source
+     (origin
+       (method url-fetch)
+       (uri (string-append
+             "https://updates.cdn-apple.com/2019/cert"
+             "/041-88431-20191011-e7ee7d98-2878-4cd9-bc0a-d98b3a1e24b1"
+             "/OSXUpd10.11.5.dmg"))
+       (sha256
+        (base32
+         "009kfk1nrrialgp69c5smzgbmd5xpvk35xmqr2fzb15h6pp33ka6"))))
+    (build-system copy-build-system)
+    (arguments
+     (list
+      #:substitutable? #f
+      #:install-plan #~'(("firmware.bin" "/lib/firmware/facetimehd/"))
+      #:phases
+      (let ((dmg-subset-size 207733123)
+            (dmg-subset-offset 204909802)
+            (firmware-size 603715)
+            (firmware-offset 81920))
+        #~(modify-phases %standard-phases
+            (add-before 'install 'extract
+              (lambda* (#:key inputs #:allow-other-keys)
+                (let ((firmware-in
+                       (string-append
+                        "System/Library/Extensions/AppleCameraInterface.kext"
+                        "/Contents/MacOS/AppleCameraInterface")))
+                  (let ((dmg-subset "dmg-subset"))
+                    (#$dump-file-chunk #$source
+                                       dmg-subset
+                                       #$dmg-subset-size
+                                       #$dmg-subset-offset)
+                    (system
+                     (string-join
+                      (list (search-input-file inputs "/bin/xz")
+                            "--decompress"
+                            "--stdout"
+                            dmg-subset
+                            "|"
+                            (search-input-file inputs "/bin/cpio")
+                            "--format=odc"
+                            "--extract"
+                            "--make-directories"
+                            (string-append "./" firmware-in)))))
+                  (let ((firmware-out "firmware.bin.gz"))
+                    (#$dump-file-chunk firmware-in
+                                       firmware-out
+                                       #$firmware-size
+                                       #$firmware-offset)
+                    (invoke
+                     (search-input-file inputs "/bin/gzip")
+                     "--decompress"
+                     (string-append firmware-out))))))))))
+    (native-inputs
+     (list cpio gzip xz))
+    (synopsis "Firmware for the FacetimeHD (Broadcom 1570) PCIe webcam")
+    (description "Firmware for the FacetimeHD webcam.  See
+@uref{https://github.com/patjak/facetimehd/wiki/Get-Started#firmware-extraction,
+patjak's facetimehd wiki} for more information.")
+    (home-page "https://support.apple.com")
+    (license (nonfree "https://www.apple.com/legal"))
+    (supported-systems '("i686-linux" "x86_64-linux"))))
+
+(define-public facetimehd-calibration
+  (package
+    (name "facetimehd-calibration")
+    (version "5.1.5769")
+    (source
+     (origin
+       (method url-fetch/zipbomb)
+       (uri (string-append
+             "https://download.info.apple.com/Mac_OS_X"
+             "/031-30890-20150812-ea191174-4130-11e5-a125-930911ba098f"
+             "/bootcamp" version".zip"))
+       (sha256
+        (base32
+         "07jbh6d0djcvcgj5hhkkw7d6mvcl228yb8rp0a2qqw20ya72rpjf"))))
+    (build-system copy-build-system)
+    (arguments
+     (list
+      #:install-plan #~'(("." "/lib/firmware/facetimehd/"
+                          #:include-regexp ("[0-9]{4}_01XX\\.dat")))
+      #:phases
+      (let ((calibration-files
+             '(("1771_01XX.dat" 19040 1644880)
+               ("1871_01XX.dat" 19040 1606800)
+               ("1874_01XX.dat" 19040 1625840)
+               ("9112_01XX.dat" 33060 1663920))))
+        #~(modify-phases %standard-phases
+            (add-before 'install 'extract
+              (lambda* (#:key inputs #:allow-other-keys)
+                (invoke (search-input-file inputs "/bin/unrar")
+                        "x"
+                        "BootCamp/Drivers/Apple/AppleCamera64.exe")
+                (for-each (lambda (spec)
+                            (apply #$dump-file-chunk "AppleCamera.sys" spec))
+                          '#$calibration-files)))))))
+    (native-inputs
+     (list unrar unzip))
+    (synopsis "Calibration files for the FacetimeHD (Broadcom 1570) PCIe webcam")
+    (description "Calibration files for the FacetimeHD webcam.  These are
+optional but make the colors look much better.  See
+@uref{https://github.com/patjak/facetimehd/wiki/Extracting-the-sensor-calibration-files,
+patjak's facetimehd wiki} for more information.")
+    (home-page "https://support.apple.com/kb/DL1837")
+    (license (nonfree "https://www.apple.com/legal"))
+    (supported-systems '("i686-linux" "x86_64-linux"))))

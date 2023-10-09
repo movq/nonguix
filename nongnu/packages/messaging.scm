@@ -2,13 +2,14 @@
 ;;; Copyright © 2021, 2022 PantherX OS Team <team@pantherx.org>
 ;;; Copyright © 2022, 2023 John Kehayias <john.kehayias@protonmail.com>
 ;;; Copyright © 2022 Evgenii Lepikhin <johnlepikhin@gmail.com>
+;;; Copyright © 2023 Giacomo Leidi <goodoldpaul@autistici.org>
+;;; Copyright © 2023 Raven Hallsby <karl@hallsby.org>
 
 (define-module (nongnu packages messaging)
   #:use-module (gnu packages base)
   #:use-module (gnu packages bash)
   #:use-module (gnu packages compression)
   #:use-module (gnu packages cups)
-  #:use-module (gnu packages databases)
   #:use-module (gnu packages fontutils)
   #:use-module (gnu packages gcc)
   #:use-module (gnu packages gl)
@@ -28,13 +29,14 @@
   #:use-module (guix utils)
   #:use-module ((guix licenses) :prefix license:)
   #:use-module (nonguix build-system binary)
+  #:use-module (nonguix build-system chromium-binary)
   #:use-module ((nonguix licenses) :prefix license:)
   #:use-module (ice-9 match))
 
 (define-public element-desktop
   (package
     (name "element-desktop")
-    (version "1.11.24")
+    (version "1.11.41")
     (source
      (origin
        (method url-fetch)
@@ -43,19 +45,13 @@
          "https://packages.riot.im/debian/pool/main/e/" name "/" name "_" version
          "_amd64.deb"))
        (sha256
-        (base32 "1bqhsimvchphjaha1vwj12xrrp8cy5bmvv1ha5nyifih8nk8k3l4"))))
+        (base32 "1m07b1ykmxly16irca171z4f718as7hqsccp1q7qrqj9b5lkmv64"))))
     (supported-systems '("x86_64-linux"))
-    (build-system binary-build-system)
+    (build-system chromium-binary-build-system)
     (arguments
      (list #:validate-runpath? #f ; TODO: fails on wrapped binary and included other files
-           #:patchelf-plan
-           #~'(("lib/Element/element-desktop"
-                ("alsa-lib" "at-spi2-atk" "at-spi2-core" "atk" "cairo" "cups"
-                 "dbus" "expat" "fontconfig-minimal" "gcc" "gdk-pixbuf" "glib"
-                 "gtk+" "libdrm" "libnotify" "libsecret" "libx11" "libxcb"
-                 "libxcomposite" "libxcursor" "libxdamage" "libxext" "libxfixes"
-                 "libxi" "libxkbcommon" "libxkbfile" "libxrandr" "libxrender"
-                 "libxtst" "mesa" "nspr" "pango" "zlib")))
+           #:wrapper-plan
+           #~'("lib/Element/element-desktop")
            #:phases
            #~(modify-phases %standard-phases
                (replace 'unpack
@@ -73,75 +69,23 @@
                    ;; Fix the .desktop file binary location.
                    (substitute* '("share/applications/element-desktop.desktop") 
                      (("/opt/Element/")
-                      (string-append #$output "/lib/Element/")))))
+                      (string-append #$output "/bin/")))))
                (add-after 'install 'symlink-binary-file-and-cleanup
                  (lambda _
                    (delete-file (string-append #$output "/environment-variables"))
                    (mkdir-p (string-append #$output "/bin"))
                    (symlink (string-append #$output "/lib/Element/element-desktop")
                             (string-append #$output "/bin/element-desktop"))))
-               (add-after 'install 'wrap-where-patchelf-does-not-work
+               (add-after 'install-wrapper 'wrap-where-patchelf-does-not-work
                  (lambda _
                    (wrap-program (string-append #$output "/lib/Element/element-desktop")
-                     `("FONTCONFIG_PATH" ":" prefix
-                       (,(string-join
-                          (list
-                           (string-append #$(this-package-input "fontconfig-minimal") "/etc/fonts")
-                           #$output)
-                          ":")))
                      `("LD_LIBRARY_PATH" ":" prefix
                        (,(string-join
                           (list
-                           (string-append #$(this-package-input "nss") "/lib/nss")
-                           (string-append #$(this-package-input "eudev") "/lib")
-                           (string-append #$(this-package-input "gcc") "/lib")
-                           (string-append #$(this-package-input "mesa") "/lib")
-                           (string-append #$(this-package-input "libxkbfile") "/lib")
-                           (string-append #$(this-package-input "zlib") "/lib")
-                           (string-append #$(this-package-input "libsecret") "/lib")
-                           (string-append #$(this-package-input "sqlcipher") "/lib")
-                           (string-append #$(this-package-input "libnotify") "/lib")
-                           (string-append #$output "/lib/Element")
-                           #$output)
+                           (string-append #$output "/lib/Element"))
                           ":")))))))))
+
     (native-inputs (list tar))
-    (inputs
-     (list alsa-lib
-           at-spi2-atk
-           at-spi2-core
-           atk
-           cairo
-           cups
-           dbus
-           eudev
-           expat
-           fontconfig
-           `(,gcc "lib")
-           glib
-           gtk+
-           libdrm
-           libnotify
-           librsvg
-           libsecret
-           libx11
-           libxcb
-           libxcomposite
-           libxcursor
-           libxdamage
-           libxext
-           libxfixes
-           libxi
-           libxkbcommon
-           libxkbfile
-           libxrandr
-           libxrender
-           libxtst
-           mesa
-           nspr
-           nss
-           pango
-           sqlcipher
-           zlib))
     (home-page "https://github.com/vector-im/element-desktop")
     (synopsis "Matrix collaboration client for desktop")
     (description "Element Desktop is a Matrix client for desktop with Element Web at
@@ -154,28 +98,22 @@ its core.")
 (define-public signal-desktop
   (package
     (name "signal-desktop")
-    (version "6.14.0")
+    (version "6.30.2")
     (source
      (origin
        (method url-fetch)
        (uri
         (string-append
-         "https://updates.signal.org/desktop/apt/pool/main/s/" name "/" name "_" version
+         "https://updates.signal.org/desktop/apt/pool/s/" name "/" name "_" version
          "_amd64.deb"))
        (sha256
-        (base32 "1gfvyw094wg6ch5bn69gvd8304nq22aiqc6jvvpykizpxg6flbvp"))))
+        (base32 "1kxxb6s7h2llksmqrjbk9nhp55r0v7573h3qz44ssb2kx8xxwgdb"))))
     (supported-systems '("x86_64-linux"))
-    (build-system binary-build-system)
+    (build-system chromium-binary-build-system)
     (arguments
      (list #:validate-runpath? #f ; TODO: fails on wrapped binary and included other files
-           #:patchelf-plan
-           #~'(("lib/Signal/signal-desktop"
-                ("alsa-lib" "at-spi2-atk" "at-spi2-core" "atk" "cairo" "cups"
-                 "dbus" "expat" "fontconfig-minimal" "gcc" "gdk-pixbuf" "glib"
-                 "gtk+" "libdrm" "libsecret" "libx11" "libxcb" "libxcomposite"
-                 "libxcursor" "libxdamage" "libxext" "libxfixes" "libxi"
-                 "libxkbcommon" "libxkbfile" "libxrandr" "libxshmfence" "libxtst"
-                 "mesa" "nspr" "pango" "pulseaudio" "zlib")))
+           #:wrapper-plan
+           #~'("lib/Signal/signal-desktop")
            #:phases
            #~(modify-phases %standard-phases
                (replace 'unpack
@@ -194,69 +132,22 @@ its core.")
                    ;; Fix the .desktop file binary location.
                    (substitute* '("share/applications/signal-desktop.desktop") 
                      (("/opt/Signal/")
-                      (string-append #$output "/lib/Signal/")))))
+                      (string-append #$output "/bin/")))))
                (add-after 'install 'symlink-binary-file-and-cleanup
                  (lambda _
                    (delete-file (string-append #$output "/environment-variables"))
                    (mkdir-p (string-append #$output "/bin"))
                    (symlink (string-append #$output "/lib/Signal/signal-desktop")
                             (string-append #$output "/bin/signal-desktop"))))
-               (add-after 'install 'wrap-where-patchelf-does-not-work
+               (add-after 'install-wrapper 'wrap-where-patchelf-does-not-work
                  (lambda _
                    (wrap-program (string-append #$output "/lib/Signal/signal-desktop")
-                     `("FONTCONFIG_PATH" ":" prefix
-                       (,(string-join
-                          (list
-                           (string-append #$(this-package-input "fontconfig-minimal") "/etc/fonts")
-                           #$output)
-                          ":")))
                      `("LD_LIBRARY_PATH" ":" prefix
                        (,(string-join
                           (list
-                           (string-append #$(this-package-input "nss") "/lib/nss")
-                           (string-append #$(this-package-input "eudev") "/lib")
-                           (string-append #$(this-package-input "gcc") "/lib")
-                           (string-append #$(this-package-input "mesa") "/lib")
-                           (string-append #$(this-package-input "libxkbfile") "/lib")
-                           (string-append #$(this-package-input "pulseaudio") "/lib")
-                           (string-append #$(this-package-input "zlib") "/lib")
-                           (string-append #$(this-package-input "libsecret") "/lib")
-                           (string-append #$output "/lib/Signal")
-                           #$output)
+                           (string-append #$output "/lib/Signal"))
                           ":")))))))))
     (native-inputs (list tar))
-    (inputs (list alsa-lib
-                  at-spi2-atk
-                  at-spi2-core
-                  atk
-                  cairo
-                  cups
-                  dbus
-                  eudev
-                  expat
-                  fontconfig
-                  `(,gcc "lib")
-                  glib
-                  gtk+
-                  libdrm
-                  librsvg
-                  libsecret
-                  libx11
-                  libxcb
-                  libxcomposite
-                  libxdamage
-                  libxext
-                  libxfixes
-                  libxkbcommon
-                  libxkbfile
-                  libxrandr
-                  libxshmfence
-                  mesa
-                  nspr
-                  nss
-                  pango
-                  pulseaudio
-                  zlib))
     (home-page "https://signal.org/")
     (synopsis "Private messenger using the Signal protocol")
     (description "Signal Desktop is an Electron application that links with Signal on Android
@@ -269,14 +160,14 @@ or iOS.")
 (define-public zoom
   (package
     (name "zoom")
-    (version "5.13.11.1288")
+    (version "5.15.12.7665")
     (source
      (origin
        (method url-fetch)
        (uri (string-append "https://cdn.zoom.us/prod/" version "/zoom_x86_64.tar.xz"))
        (file-name (string-append name "-" version "-x86_64.tar.xz"))
        (sha256
-        (base32 "1ngj15j9d7i0z4d0wraziyv75whp0digh8rg1jzfmi0ws3ir2d6b"))))
+        (base32 "1pmxgfafwlxnrcw1fay91krjqbf1kaf5ng4f3na0p6liyd5c6fhq"))))
     (supported-systems '("x86_64-linux"))
     (build-system binary-build-system)
     (arguments
@@ -391,6 +282,8 @@ or iOS.")
                                         "pango"
                                         "pulseaudio"
                                         "xcb-util"
+                                        "xcb-util-image"
+                                        "xcb-util-keysyms"
                                         "xcb-util-wm"
                                         "xcb-util-renderutil"
                                         "zlib")))))
@@ -430,6 +323,8 @@ or iOS.")
                                         "pango"
                                         "pulseaudio"
                                         "xcb-util"
+                                        "xcb-util-image"
+                                        "xcb-util-keysyms"
                                         "xcb-util-wm"
                                         "xcb-util-renderutil"
                                         "zlib")))))))

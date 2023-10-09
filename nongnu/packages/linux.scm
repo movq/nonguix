@@ -21,11 +21,14 @@
 ;;; Copyright © 2023 Krzysztof Baranowski <pharcosyle@gmail.com>
 ;;; Copyright © 2023 Morgan Smith <Morgan.J.Smith@outlook.com>
 ;;; Copyright © 2023 Jelle Licht <jlicht@fsfe.org>
+;;; Copyright © 2023 Adam Kandur <rndd@tuta.io>
+;;; Copyright © 2023 Hilton Chain <hako@ultrarare.space>
 
 (define-module (nongnu packages linux)
   #:use-module (gnu packages)
   #:use-module (gnu packages base)
   #:use-module (gnu packages compression)
+  #:use-module (gnu packages cpio)
   #:use-module (gnu packages linux)
   #:use-module (guix licenses)
   #:use-module (guix packages)
@@ -42,13 +45,23 @@
   #:use-module (srfi srfi-1)
   #:export (corrupt-linux))
 
+(define %default-extra-linux-options
+  (@@ (gnu packages linux) %default-extra-linux-options))
+
+(define config->string
+  (@@ (gnu packages linux) config->string))
+
 (define (linux-url version)
   "Return a URL for Linux VERSION."
   (string-append "mirror://kernel.org"
                        "/linux/kernel/v" (version-major version) ".x"
                        "/linux-" version ".tar.xz"))
 
-(define* (corrupt-linux freedo #:key (name "linux") (configs '()))
+(define* (corrupt-linux freedo
+                        #:key
+                        (name "linux")
+                        (configs '())
+                        (defconfig #f))
 
   ;; TODO: This very directly depends on guix internals.
   ;; Throw it all out when we manage kernel hashes.
@@ -80,7 +93,8 @@
                    (method url-fetch)
                    (uri url)
                    (hash hash))
-        #:configs configs))
+        #:configs configs
+        #:defconfig defconfig))
       (version version)
       (home-page "https://www.kernel.org/")
       (synopsis "Linux kernel with nonfree binary blobs included")
@@ -88,8 +102,11 @@
        "The unmodified Linux kernel, including nonfree blobs, for running Guix System
 on hardware which requires nonfree software to function."))))
 
-(define-public linux-6.2
-  (corrupt-linux linux-libre-6.2))
+(define-public linux-6.5
+  (corrupt-linux linux-libre-6.5))
+
+(define-public linux-6.4
+  (corrupt-linux linux-libre-6.4))
 
 (define-public linux-6.1
   (corrupt-linux linux-libre-6.1))
@@ -109,31 +126,135 @@ on hardware which requires nonfree software to function."))))
 (define-public linux-4.14
   (corrupt-linux linux-libre-4.14))
 
-(define-public linux linux-6.2)
+(define-public linux linux-6.4)
 ;; linux-lts points to the *newest* released long-term support version.
-(define-public linux-lts linux-5.15)
+(define-public linux-lts linux-6.1)
 
-(define-public linux-arm64-generic-6.0
+(define-public linux-arm64-generic-5.10
+  (corrupt-linux linux-libre-arm64-generic-5.10 #:name "linux-arm64-generic"))
+
+(define-public linux-arm64-generic-5.4
+  (corrupt-linux linux-libre-arm64-generic-5.4 #:name "linux-arm64-generic"))
+
+(define-public linux-arm64-generic
   (corrupt-linux linux-libre-arm64-generic #:name "linux-arm64-generic"))
 
-(define-public linux-arm64-generic-5.15
-  (corrupt-linux linux-libre-arm64-generic #:name "linux-arm64-generic"))
+
+;;;
+;;; Linux-XanMod
+;;;
 
-(define-public linux-arm64-generic linux-arm64-generic-6.0)
+(define (make-linux-xanmod-source version xanmod-revision hash-string)
+  (origin
+    (method url-fetch)
+    (uri (string-append "https://gitlab.com/xanmod/linux/-/archive/"
+                        version "-" xanmod-revision ".tar.bz2"))
+    (sha256 hash-string)))
 
-(define-public linux-arm64-generic-lts linux-arm64-generic-5.15)
+(define* (make-linux-xanmod version xanmod-revision source
+                            #:key
+                            (name "linux-xanmod")
+                            (xanmod-defconfig "config_x86-64-v1"))
+  (let ((defconfig xanmod-defconfig)    ;to be used in phases.
+        (base (customize-linux #:name name
+                               #:source source
+                               #:defconfig xanmod-defconfig
+                               ;; EXTRAVERSION is used instead.
+                               #:configs (config->string
+                                          '(("CONFIG_LOCALVERSION" . "")))
+                               #:extra-version xanmod-revision)))
+    (package
+      (inherit base)
+      (version version)
+      (arguments
+       (substitute-keyword-arguments (package-arguments base)
+         ((#:phases phases)
+          #~(modify-phases #$phases
+              ;; EXTRAVERSION is used instead.
+              (add-after 'unpack 'remove-localversion
+                (lambda _
+                  (when (file-exists? "localversion")
+                    (delete-file "localversion"))))
+              (add-before 'configure 'add-xanmod-defconfig
+                (lambda _
+                  (rename-file
+                   (string-append "CONFIGS/xanmod/gcc/" #$defconfig)
+                   ".config")
+
+                  ;; Adapted from `make-linux-libre*'.
+                  (chmod ".config" #o666)
+                  (let ((port (open-file ".config" "a"))
+                        (extra-configuration
+                         #$(config->string
+                            ;; FIXME: There might be other support missing.
+                            (append '(("CONFIG_BLK_DEV_NVME" . #t)
+                                      ("CONFIG_CRYPTO_XTS" . m)
+                                      ("CONFIG_VIRTIO_CONSOLE" . m))
+                                    %default-extra-linux-options))))
+                    (display extra-configuration port)
+                    (close-port port))
+                  (invoke "make" "oldconfig")
+
+                  (rename-file
+                   ".config"
+                   (string-append "arch/x86/configs/" #$defconfig))))))))
+      (native-inputs
+       (modify-inputs (package-native-inputs base)
+         ;; cpio is needed for CONFIG_IKHEADERS.
+         (append cpio zstd)))
+      (home-page "https://xanmod.org/")
+      (supported-systems '("x86_64-linux"))
+      (synopsis
+       "Linux kernel distribution with custom settings and new features")
+      (description
+       "This package provides XanMod kernel, a general-purpose Linux kernel
+distribution with custom settings and new features.  It's built to provide a
+stable, responsive and smooth desktop experience."))))
+
+;; Linux-XanMod sources
+(define-public linux-xanmod-version "6.4.3")
+(define-public linux-xanmod-revision "xanmod1")
+(define-public linux-xanmod-source
+  (make-linux-xanmod-source
+   linux-xanmod-version
+   linux-xanmod-revision
+   (base32 "0z6f7lnwbw2y7wwfr253d6gg4kz0l62s71pj266hb9c0dj15xl0r")))
+
+(define-public linux-xanmod-lts-version "6.1.38")
+(define-public linux-xanmod-lts-revision "xanmod1")
+(define-public linux-xanmod-lts-source
+  (make-linux-xanmod-source
+   linux-xanmod-lts-version
+   linux-xanmod-lts-revision
+   (base32 "0c56jmvzzn8jakxffifnrj6pixywrlcwq6sxriylqxfq96bb8can")))
+
+;; Linux-XanMod packages
+(define-public linux-xanmod
+  (make-linux-xanmod linux-xanmod-version
+                     linux-xanmod-revision
+                     linux-xanmod-source))
+
+(define-public linux-xanmod-lts
+  (make-linux-xanmod linux-xanmod-lts-version
+                     linux-xanmod-lts-revision
+                     linux-xanmod-lts-source))
+
+
+;;;
+;;; Firmwares
+;;;
 
 (define-public linux-firmware
   (package
     (name "linux-firmware")
-    (version "20230404")
+    (version "20230919")
     (source (origin
               (method url-fetch)
               (uri (string-append "mirror://kernel.org/linux/kernel/firmware/"
                                   "linux-firmware-" version ".tar.xz"))
               (sha256
                (base32
-                "01znf4gnymxn8q189gda6rlksw1nz1980ypkj0jcw71inlmsvyf3"))))
+                "1bc4y0w2xa9r3wb7bprdmy6vqj7swxbc9p542zhc9bxx086xmylp"))))
     (build-system gnu-build-system)
     (arguments
      `(#:tests? #f
@@ -616,8 +737,8 @@ network adapters.")
       (license gpl2))))
 
 (define-public rtl8821ce-linux-module
-  (let ((commit "538c34671b391340e0ae23ff11bde77b6588496c")
-        (revision "9"))
+  (let ((commit "a478095a45d8aa957b45be4f9173c414efcacc6f")
+        (revision "10"))
     (package
       (name "rtl8821ce-linux-module")
       (version (git-version "0.0.0" revision commit))
@@ -630,7 +751,7 @@ network adapters.")
          (file-name (git-file-name name version))
          (sha256
           (base32
-           "0p7xj032bp3h6wp27dhf2j42bgd4gvpk7w95n830awbj07c04dss"))))
+           "00cn87jjrcxjqr3n8jv4w3n64zksmzz05fdr1gdvnbx1ab5739f6"))))
       (build-system linux-module-build-system)
       (arguments
        (list #:make-flags
@@ -659,8 +780,8 @@ network adapters.")
       (license gpl2))))
 
 (define-public rtl8812au-aircrack-ng-linux-module
-  (let ((commit "08589e2f8c18d4de18a28d92c74d0a2191bb86b9")
-        (revision "10"))
+  (let ((commit "35308f4dd73e77fa572c48867cce737449dd8548")
+        (revision "11"))
     (package
       (inherit rtl8821ce-linux-module)
       (name "rtl8812au-aircrack-ng-linux-module")
@@ -673,7 +794,7 @@ network adapters.")
                (commit commit)))
          (file-name (git-file-name name version))
          (sha256
-          (base32 "07yiya5ckm578pwxdm5nnyq45vnw4zjbd31a5365l9cwbpfji67s"))
+          (base32 "1clqrgmq5fhzybbiapmdbhg5qfx9k21r0hqa9pqmyinaqhvfnhfj"))
          (modules '((guix build utils)))
          (snippet
           #~(begin
@@ -914,10 +1035,44 @@ chipsets from Broadcom:
        "/b60fa04881bf8f9b9d578f57d1dfa596cae2a82e"
        "/LICENSE.broadcom_bcm20702")))))
 
+(define-public facetimehd
+  (package
+    (name "facetimehd")
+    (version "0.5.18")
+    (source
+     (origin
+       (method git-fetch)
+       (uri (git-reference
+             (url "https://github.com/patjak/facetimehd")
+             (commit version)))
+       (file-name (git-file-name "facetimehd" version))
+       (sha256
+        (base32
+         "1598pzjnbij3knvqmk2yslj26wmqiqjqgqgcw9p9jx6z7bdjvvsh"))))
+    (build-system linux-module-build-system)
+    (arguments
+     '(#:tests? #f))
+    (synopsis "Linux driver for the FacetimeHD (Broadcom 1570) PCIe webcam")
+    (description "Linux driver for the FacetimeHD webcam.  According to Apple the
+following models contain a Facetime HD camera and should be compatible with this
+driver:
+@itemize
+@item iMac (21,5\", since mid 2011)
+@item iMac (27\", since mid 2011)
+@item MacBook Air (since mid 2011)
+@item MacBook Pro (15\", since early 2011)
+@item MacBook Pro (17\", since early 2011)
+@item MacBook Pro (13\", since early 2011)
+@item Thunderbolt display
+@end itemize")
+    (home-page "https://github.com/patjak/facetimehd")
+    (license gpl2)
+    (supported-systems '("i686-linux" "x86_64-linux"))))
+
 (define-public intel-microcode
   (package
     (name "intel-microcode")
-    (version "20230214")
+    (version "20230808")
     (source
      (origin
        (method git-fetch)
@@ -928,15 +1083,15 @@ chipsets from Broadcom:
              (commit (string-append "microcode-" version))))
        (file-name (git-file-name name version))
        (sha256
-        (base32 "047m1c7bap19cqxpqy2xlzngn8i8jfk44ffbkmkhw4nfrval81sb"))))
+        (base32 "1n0w6q46xag7a9iddl3v1gh1rzv9h6kiyy739ac6vg3v8lazh9n7"))))
     (build-system copy-build-system)
     (arguments
-     `(#:install-plan
-       (let ((doc (string-append "share/doc/" ,name "-" ,version "/")))
-         `(("intel-ucode" "lib/firmware/")
-           ("README.md" ,doc)
-           ("releasenote.md" ,doc)
-           ("security.md" ,doc)))))
+     (list #:install-plan
+           #~(let ((doc (string-append "share/doc/" #$name "-" #$version "/")))
+               `(("intel-ucode" "lib/firmware/")
+                 ("README.md" ,doc)
+                 ("releasenote.md" ,doc)
+                 ("security.md" ,doc)))))
     (home-page
      "https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files")
     (synopsis "Processor microcode firmware for Intel CPUs")

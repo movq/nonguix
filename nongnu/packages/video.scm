@@ -6,14 +6,16 @@
   #:use-module (gnu packages video)
   #:use-module (guix build utils)
   #:use-module (guix build-system cmake)
+  #:use-module (guix gexp)
   #:use-module (guix git-download)
   #:use-module (guix packages)
+  #:use-module (guix utils)
   #:use-module ((guix licenses) #:prefix license:))
 
 (define-public gmmlib
   (package
     (name "gmmlib")
-    (version "22.3.3")
+    (version "22.3.9")
     (source (origin
               (method git-fetch)
               (uri (git-reference
@@ -22,7 +24,7 @@
               (file-name (git-file-name name version))
               (sha256
                (base32
-                "0rbbzqpxgqklgdmbl7wjyblylm1g0jan3552scbi12z31bvq2442"))))
+                "0m88lxlqqs5wdk4icf2ahbigr0q87j1c0damq7q0r55h72pf6zyv"))))
     (build-system cmake-build-system)
     (arguments
      ;; Tests are run as part of the normal build step
@@ -38,7 +40,7 @@ for VAAPI.")
 (define-public intel-media-driver
   (package
     (name "intel-media-driver")
-    (version "22.6.6")
+    (version "23.3.0")
     (source (origin
               (method git-fetch)
               (uri (git-reference
@@ -47,16 +49,16 @@ for VAAPI.")
               (file-name (git-file-name name version))
               (sha256
                (base32
-                "08rnvhpgf7czb39swpm0qds11v5zlfjzl1wxnjl7df9vgf1lx3qh"))))
+                "1zh6zgfyp14zlnd6jvhqz9q5rlyk7cb3nam791slh0h7r5f0iimm"))))
     (build-system cmake-build-system)
     (inputs (list libva gmmlib))
     (native-inputs (list pkg-config))
     (arguments
-     '(#:tests? #f ;Tests are run as part of the normal build step
-       #:configure-flags
-       (list "-DENABLE_NONFREE_KERNELS=OFF"
-             (string-append "-DLIBVA_DRIVERS_PATH="
-                            (assoc-ref %outputs "out") "/lib/dri"))))
+     (list #:tests? #f ;Tests are run as part of the normal build step
+           #:configure-flags
+           #~(list "-DENABLE_NONFREE_KERNELS=OFF"
+                   (string-append "-DLIBVA_DRIVERS_PATH="
+                                  #$output "/lib/dri"))))
     ;; XXX Because of <https://issues.guix.gnu.org/issue/22138>, we need to add
     ;; this to all VA-API back ends instead of once to libva.
     (native-search-paths
@@ -72,4 +74,21 @@ accelerated decoding, encoding, and video post processing for the GEN based
 graphics hardware.")
     (license (list license:expat license:bsd-3))))
 
-intel-media-driver
+(define-public intel-media-driver/nonfree
+  (package
+    (inherit intel-media-driver)
+    (name "intel-media-driver-nonfree")
+    (arguments
+     (substitute-keyword-arguments (package-arguments intel-media-driver)
+       ((#:configure-flags flags #~'())
+        #~(cons "-DENABLE_NONFREE_KERNELS=ON"
+                (delete "-DENABLE_NONFREE_KERNELS=OFF" #$flags)))))
+    (synopsis
+       (string-append
+        (package-synopsis intel-media-driver)
+        " with nonfree kernels"))
+    (description
+       (string-append
+        (package-description intel-media-driver)
+        "  This build of intel-media-driver includes nonfree blobs to fully enable the
+video decode capabilities of supported Intel GPUs."))))

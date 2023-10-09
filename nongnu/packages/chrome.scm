@@ -1,5 +1,5 @@
 ;;; SPDX-License-Identifier: GPL-3.0-or-later
-;;; Copyright © 2022 Giacomo Leidi <goodoldpaul@autistici.org>
+;;; Copyright © 2022, 2023 Giacomo Leidi <goodoldpaul@autistici.org>
 ;;; Copyright © 2022 Mathieu Othacehe <m.othacehe@gmail.com>
 ;;; Copyright © 2022 Jonathan Brielmaier <jonathan.brielmaier@web.de>
 
@@ -7,32 +7,23 @@
   #:use-module (gnu packages base)
   #:use-module (gnu packages compression)
   #:use-module (gnu packages curl)
-  #:use-module (gnu packages cups)
-  #:use-module (gnu packages fontutils)
   #:use-module (gnu packages fonts)
   #:use-module (gnu packages freedesktop)
-  #:use-module (gnu packages databases)
-  #:use-module (gnu packages gcc)
   #:use-module (gnu packages gl)
-  #:use-module (gnu packages glib)
-  #:use-module (gnu packages gnome)
   #:use-module (gnu packages gtk)
   #:use-module (gnu packages image)
   #:use-module (gnu packages linux)
-  #:use-module (gnu packages nss)
   #:use-module (gnu packages pciutils)
   #:use-module (gnu packages photo)
   #:use-module (gnu packages video)
   #:use-module (gnu packages wget)
-  #:use-module (gnu packages xdisorg)
   #:use-module (gnu packages xiph)
-  #:use-module (gnu packages xml)
   #:use-module (gnu packages xorg)
   #:use-module (guix download)
   #:use-module (guix gexp)
   #:use-module (guix packages)
   #:use-module (guix build-system gnu)
-  #:use-module (nonguix build-system binary)
+  #:use-module (nonguix build-system chromium-binary)
   #:use-module (nonguix licenses)
   #:use-module (ice-9 string-fun))
 
@@ -40,14 +31,7 @@
   (let* ((name (string-append "google-chrome-" repo))
          (appname (if (string=? repo "stable")
                       "chrome"
-                      (string-replace-substring name "google-" "")))
-         (patchelf-inputs (list "alsa-lib" "at-spi2-atk" "at-spi2-core" "atk" "cairo" "cups"
-                                "dbus" "eudev" "expat" "freetype" "fontconfig-minimal" "gcc" "gdk-pixbuf"
-                                "glib" "gtk" "harfbuzz" "libdrm" "libnotify" "libsecret" "libx11"
-                                "libxcb" "libexif" "libxcomposite" "libxcursor" "libxdamage"
-                                "libxext" "libxfixes" "libxi" "libxkbcommon" "libxkbfile" "libxrandr"
-                                "libxrender" "libxtst" "libnotify" "mesa" "nspr" "pango" "pipewire"
-                                "sqlcipher" "xdg-utils" "zlib")))
+                      (string-replace-substring name "google-" ""))))
     (package
      (name name)
      (version version)
@@ -59,16 +43,15 @@
                  name "/" name "_" version "-1_amd64.deb"))
                (sha256
                 (base32 hash))))
-     (build-system binary-build-system)
+     (build-system chromium-binary-build-system)
      (arguments
       (list
         ;; almost 300MB, faster to download and build from Google servers
         #:substitutable? #f
-        #:patchelf-plan
-         #~(let ((patchelf-inputs (list #$@patchelf-inputs))
-                 (path (string-append "opt/google/" #$appname "/")))
+        #:wrapper-plan
+         #~(let ((path (string-append "opt/google/" #$appname "/")))
              (map (lambda (file)
-                    (cons (string-append path file) (list patchelf-inputs)))
+                    (string-append path file))
                   '("chrome"
                     "chrome-sandbox"
                     "chrome_crashpad_handler"
@@ -109,94 +92,53 @@
                      ((old-exe) exe))
                    (substitute* (string-append usr/share "/menu/google-" #$appname ".menu")
                      (("/opt") share)
-                     ((old-exe) exe))
-                   #t)))
-             (add-after 'install 'install-wrapper
+                     ((old-exe) exe)))))
+             (add-after 'install 'install-icons
+                (lambda _
+                  (define (format-icon-size name)
+                    (car
+                      (string-split
+                       (string-drop-right (string-drop name 13) 4)
+                       #\_)))
+                  (let ((icons (string-append #$output "/share/icons/hicolor"))
+                        (share (string-append #$output "/share/google/" #$appname)))
+                    (for-each (lambda (icon)
+                                (let* ((icon-name (basename icon))
+                                       (icon-size (format-icon-size icon-name))
+                                       (target (string-append icons "/" icon-size "x" icon-size "/apps/google-" #$appname ".png")))
+                                  (mkdir-p (dirname target))
+                                  (rename-file icon target)))
+                              (find-files share "product_logo_.*\\.png")))))
+             (add-before 'install-wrapper 'install-exe
               (lambda _
                 (let* ((bin (string-append #$output "/bin"))
                        (exe (string-append bin "/google-" #$appname))
                        (share (string-append #$output "/share"))
-                       (chrome-target (string-append share "/google/" #$appname "/google-" #$appname))
-                       (patchelf-inputs-packages (list #$@(map (lambda (i) (this-package-input i)) patchelf-inputs)))
-                       (ld-library-libs (map (lambda (input)
-                                               (string-append input "/lib"))
-                                             patchelf-inputs-packages)))
+                       (chrome-target (string-append share "/google/" #$appname "/google-" #$appname)))
                   (mkdir-p bin)
                   (symlink chrome-target exe)
                   (wrap-program exe
-                    `("FONTCONFIG_PATH" ":" prefix
-                      (,(string-join
-                         (list
-                          (string-append #$(this-package-input "fontconfig-minimal") "/etc/fonts")
-                          #$output)
-                         ":")))
-                    `("LD_LIBRARY_PATH" ":" prefix
-                      (,(string-join
-                         (append
-                          ld-library-libs
-                          (list
-                           (string-append #$(this-package-input "nss") "/lib/nss")
-                           #$output))
-                         ":")))
                     '("CHROME_WRAPPER" = (#$appname)))))))))
      (native-inputs (list tar))
      (inputs
-      (list alsa-lib
-            at-spi2-atk
-            at-spi2-core
-            atk
-            bzip2
-            cairo
+      (list bzip2
             curl
-            cups
-            dbus
-            eudev
-            expat
             flac
-            fontconfig
-            freetype
             font-liberation
-            `(,gcc "lib")
             gdk-pixbuf
-            glib
-            gtk
             harfbuzz
-            libdrm
             libexif
             libglvnd
-            libnotify
             libpng
-            librsvg
-            libsecret
             libva
-            libx11
-            libxcb
-            libxcomposite
-            libxcursor
-            libxdamage
-            libxext
-            libxfixes
-            libxi
-            libxkbcommon
-            libxkbfile
-            libxrandr
             libxscrnsaver
-            libxshmfence
-            libxrender
-            libxtst
-            mesa
-            nspr
-            nss
             opus
-            pango
             pciutils
             pipewire
             snappy
-            sqlcipher
             util-linux
             xdg-utils
-            wget
-            zlib))
+            wget))
      (synopsis  "Freeware web browser")
      (supported-systems '("x86_64-linux"))
      (description "Google Chrome is a cross-platform web browser developed by Google.")
@@ -204,10 +146,10 @@
      (license (nonfree "https://www.google.com/intl/en/chrome/terms/")))))
 
 (define-public google-chrome-stable
-  (make-google-chrome "stable" "112.0.5615.49" "0jq5pbyayk8pa9ksxp2dk3k7j2jic506mfpkq1a1z48j1l4fkr5i"))
+  (make-google-chrome "stable" "116.0.5845.110" "08hqymyzah1wiyag56iivvydy1zph4jzicjjjyh6br07lpfps7nk"))
 
 (define-public google-chrome-beta
-  (make-google-chrome "beta" "112.0.5615.49" "146gd9csj08d1ygwwh6gyqqbi7d34mhv3vv7wv4a8z9hn7jhdifg"))
+  (make-google-chrome "beta" "116.0.5845.50" "047wsszg4c23vxq93a335iymiqpy7lw5izzz4f0zk1a4sijafd59"))
 
 (define-public google-chrome-unstable
-  (make-google-chrome "unstable" "113.0.5672.24" "0byksvk781gmh5fmjmc77jh19gvkzadf78yr9b4c42las44g4pn4"))
+  (make-google-chrome "unstable" "119.0.6034.6" "156rsklyi1z014pyximwyjsnc2rhdky1kck9g63738vnhcv398b0"))
