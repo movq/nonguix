@@ -96,13 +96,6 @@ some freedo package or an output of package-version procedure."
                         (configs (nonguix-extra-linux-options freedo))
                         (defconfig #f))
 
-  ;; TODO: This very directly depends on guix internals.
-  ;; Throw it all out when we manage kernel hashes.
-  (define gexp-inputs (@@ (guix gexp) gexp-inputs))
-
-  (define extract-gexp-inputs
-    (compose gexp-inputs force origin-uri))
-
   (define (find-source-hash sources url)
     (let ((versioned-origin
            (find (lambda (source)
@@ -114,10 +107,8 @@ some freedo package or an output of package-version procedure."
 
   (let* ((version (package-version freedo))
          (url (linux-url version))
-         (pristine-source (package-source freedo))
-         (inputs (map gexp-input-thing (extract-gexp-inputs pristine-source)))
-         (sources (filter origin? inputs))
-         (hash (find-source-hash sources url)))
+         (pristine-source freedo)
+         (hash (find-source-hash (list (package-source freedo)) url)))
     (package
       (inherit
        (customize-linux
